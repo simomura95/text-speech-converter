@@ -3,9 +3,11 @@ from PyPDF2 import PdfReader  # to work with pdf
 from customtkinter import *
 import speech_recognition as sr  # to convert wav into text, using google services
 from pydub import AudioSegment  # support package to work with audio segment (here used to convert mp3 into wav)
+from datetime import datetime
 import os
 
 # AudioSegment.converter = "C:/ffmpeg/bin"  # not needed if ffmpeg path is added to environment variable PATH
+LANGUAGE = 'en'
 
 # app to convert:
 # - a text file (.pdf, .doc, .txt or from user input) to .mp3 file (text to speech)
@@ -42,26 +44,39 @@ class TextSpeech(CTk):
         self.textbox.grid(row=3, column=0, columnspan=2)
 
         self.input_to_speech = CTkButton(self, text="Convert text", command=self.input_to_text)
-        self.input_to_speech.grid(row=4, column=0, columnspan=2, pady=(10, 0))
+        self.input_to_speech.grid(row=4, column=0, columnspan=2, pady=(10, 20))
+
+        self.converting_label = CTkLabel(self, text='Converting...')
+
+    def start(self):
+        """Support function: when starting a conversion, tells the user and disable all buttons"""
+        self.text_to_speech.configure(state="disabled")
+        self.speech_to_text.configure(state="disabled")
+        self.input_to_speech.configure(state="disabled")
+        self.textbox.configure(state="disabled")
+        self.converting_label.grid(row=5, column=0, columnspan=2)
 
     def file_to_text(self):
         """Acquire a txt, doc or pdf file and convert it to plain text"""
         self.start_path = filedialog.askopenfilename(filetypes=[('File', '*.txt'), ('File', '*.doc'), ('File', '*.pdf')])
-        # print(self.start_path)
+        if not self.start_path:
+            return
+        self.start()
         if self.start_path[-4:] == ".pdf":  # if pdf file
             reader = PdfReader(self.start_path)
             self.text = "".join([reader.pages[p].extract_text(0) for p in range(len(reader.pages))]).replace('\n', '')
         else:  # if doc or txt file
             with open(self.start_path, encoding="utf8") as file:
                 self.text = file.read()
-        # print(self.text)
         self.text_to_mp3()
 
     def mp3_to_file(self):
         """Acquire a mp3 file and converts it into a wav file, which then is used for generating plaint text and the resulting .doc file.
         Conversion uses google services, but quality seems to be pretty low"""
         self.start_path = filedialog.askopenfilename(filetypes=[('File', '*.mp3')])
-        print(self.start_path)
+        if not self.start_path:
+            return
+        self.start()
 
         # convert mp3 file to wav
         sound = AudioSegment.from_mp3(self.start_path)
@@ -80,21 +95,28 @@ class TextSpeech(CTk):
         self.end_path = f"{self.start_path[:-4]}.doc"
         with open(self.end_path, 'w') as output_file:
             output_file.write(self.text)
+        self.finish()
 
     def input_to_text(self):
         """Get input from user"""
         self.text = self.textbox.get(1.0, "end-1c")
-        self.start_path = "app_output.doc"
+        if not self.text:
+            return
+        self.start()
+        curr_time = datetime.now().strftime("%Y%m%d-%H.%M.%S")
+        self.start_path = f"app_output_{curr_time}.doc"
         with open(self.start_path, "w") as text_file:
             text_file.write(self.text)
         self.text_to_mp3()
+        print("ok")
+        os.remove(self.start_path)  # remove the temporary doc file
 
     def text_to_mp3(self):
         """Convert text into mp3. Uses Google text-to-speech (gTTS) service"""
-        my_tts = gTTS(text=self.text, lang='en', slow=False)
+        my_tts = gTTS(text=self.text, lang=LANGUAGE, slow=False)
         self.end_path = f"{self.start_path[:-4]}.mp3"
-        # print(self.end_path)
         my_tts.save(self.end_path)
+        self.finish()
 
     def finish(self):
         """After conversion, open resulting file and close GUI"""
