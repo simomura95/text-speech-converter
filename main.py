@@ -108,7 +108,6 @@ class TextSpeech(CTk):
         with open(self.start_path, "w") as text_file:
             text_file.write(self.text)
         self.text_to_mp3()
-        print("ok")
         os.remove(self.start_path)  # remove the temporary doc file
 
     def text_to_mp3(self):
